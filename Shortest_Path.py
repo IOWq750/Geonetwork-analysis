@@ -3,7 +3,7 @@ import networkx as nx
 import import_export_shp
 import arcpy
 
-arcpy.env.overwriteOutput = True
+
 def calculate_shortest_path(G, source_point, target_point, output_workspace, weight_attribute, method):
     """Calculates the shortest path between two nodes in graph represented as shapefiles.
 
@@ -31,6 +31,7 @@ def calculate_shortest_path(G, source_point, target_point, output_workspace, wei
         path as a list of node coordinates list
         """
 
+    arcpy.env.overwriteOutput = True
     arcpy.FeatureClassToFeatureClass_conversion(source_point, output_workspace, 'Source.shp')
     arcpy.FeatureClassToFeatureClass_conversion(target_point, output_workspace, 'Target.shp')
     source = nx.read_shp(r'{0}'.format(output_workspace + '\Source.shp'))
@@ -38,6 +39,7 @@ def calculate_shortest_path(G, source_point, target_point, output_workspace, wei
     path = nx.shortest_path(G, list(source.nodes())[0], list(target.nodes())[0], weight_attribute, method)
     arcpy.AddMessage(path)
     return path
+
 
 def path_to_graph(G, path):
     path_edges = []
@@ -55,11 +57,18 @@ def path_to_graph(G, path):
     return G
 
 
-G = import_export_shp.convert_shp_to_graph(arcpy.GetParameterAsText(0), arcpy.GetParameterAsText(1),
-                                           arcpy.GetParameterAsText(2), arcpy.GetParameterAsText(3))
-shortest_path = calculate_shortest_path(G, arcpy.GetParameterAsText(5), arcpy.GetParameterAsText(6),
-                                        arcpy.GetParameterAsText(8), arcpy.GetParameterAsText(4),
-                                        arcpy.GetParameterAsText(7))
-G = path_to_graph(G, shortest_path)
-import_export_shp.export_path_to_shp(G, arcpy.GetParameterAsText(2), arcpy.GetParameterAsText(3),
-                                     arcpy.GetParameterAsText(8))
+if __name__ == 'main':
+    in_graph = arcpy.GetParameterAsText(0)
+    digraph = arcpy.GetParameterAsText(1)
+    multigraph = arcpy.GetParameterAsText(2)
+    multi_attr = arcpy.GetParameterAsText(3)
+    source = arcpy.GetParameterAsText(4)
+    target = arcpy.GetParameterAsText(5)
+    output = arcpy.GetParameterAsText(6)
+    weight = arcpy.GetParameterAsText(7)
+    method = arcpy.GetParameterAsText(8)
+
+    G = import_export_shp.convert_shp_to_graph(in_graph, digraph, multigraph, multi_attr)
+    shortest_path = calculate_shortest_path(G, source, target, output, weight, method)
+    G = path_to_graph(G, shortest_path)
+    import_export_shp.export_path_to_shp(G, multigraph, multi_attr, method)

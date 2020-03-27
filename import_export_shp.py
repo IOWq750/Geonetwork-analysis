@@ -40,7 +40,7 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
 
 
 def export_path_to_shp(G, multy, multy_attribute, output_workspace):
-    """docstring"""
+    """Export of path (list of nodes) through graph to shapefile"""
     for item in ['edges.shp', 'nodes,shp']:
         filename = os.path.join(output_workspace, item)
         if os.path.exists(filename):
