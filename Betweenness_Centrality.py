@@ -29,7 +29,7 @@ def betweenness_multiedge_distribution(G, ebc):
     nx.set_edge_attributes(G, edge_betweenness_values, 'BC')
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
     in_graph = arcpy.GetParameterAsText(0)
     digraph = arcpy.GetParameterAsText(1)
     multigraph = arcpy.GetParameterAsText(2)

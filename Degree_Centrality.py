@@ -18,7 +18,7 @@ def degree_centrality(in_graph, multigraph, multi_attr, output, digraph):
     nx.write_shp(G, output)
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
     in_graph = arcpy.GetParameterAsText(0)
     multigraph = arcpy.GetParameterAsText(1)
     multi_attr = arcpy.GetParameterAsText(2)

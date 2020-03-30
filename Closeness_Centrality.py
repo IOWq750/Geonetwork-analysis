@@ -3,7 +3,7 @@ import networkx as nx
 import import_export_shp
 import arcpy
 
-if  __name__ == 'main':
+if __name__ == '__main__':
     in_graph = arcpy.GetParameterAsText(0)
     multigraph = arcpy.GetParameterAsText(1)
     multi_attr = arcpy.GetParameterAsText(2)
