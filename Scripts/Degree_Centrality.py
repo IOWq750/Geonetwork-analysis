@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import networkx as nx
-from Auxillary_Scripts import import_export_shp as aux_ie
+from auxillary_scripts import import_export_shp as aux_ie
 import arcpy
 
 

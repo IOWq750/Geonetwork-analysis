@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import networkx as nx
-from Auxillary_Scripts import import_export_shp as aux_ie
+from auxillary_scripts import import_export_shp as aux_ie
 import arcpy
 
 
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     weight = arcpy.GetParameterAsText(4)
     output = arcpy.GetParameterAsText(5)
     normalized = arcpy.GetParameterAsText(6)
+
 
     G = aux_ie.convert_shp_to_graph(in_graph.encode('utf-8'), digraph, multigraph, multi_attr)
     if normalized == 'false':
