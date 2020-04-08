@@ -28,10 +28,10 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
         Graph
         """
     if multigraph == 'true':
-        G = nx_multi_shp.read_shp(r'{0}'.format(input_shp.encode('utf-8')), parallel_edges_attribute, simplify=True,
+        G = nx_multi_shp.read_shp(r'{0}'.format(input_shp), parallel_edges_attribute, simplify=True,
                                   geom_attrs=True, strict=True)
     else:
-        G = nx.read_shp(r'{0}'.format(input_shp.encode('utf-8')))
+        G = nx.read_shp(r'{0}'.format(input_shp))
     if directed == 'true':
         graph = G
     else:
