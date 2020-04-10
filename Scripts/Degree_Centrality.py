@@ -2,10 +2,11 @@
 import networkx as nx
 import os
 import sys
+import arcpy
 curdir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(1, curdir)
 import import_export_shp as aux_ie
-import arcpy
+
 
 
 def degree_centrality(in_graph, multigraph, multi_attr, output, digraph):
@@ -18,8 +19,7 @@ def degree_centrality(in_graph, multigraph, multi_attr, output, digraph):
     else:
         deg_centrality = nx.degree_centrality(G)
         nx.set_node_attributes(G, deg_centrality, 'DC')
-    G.remove_edges_from(G.edges)
-    nx.write_shp(G, output.encode('utf-8'))
+    nx.write_shp(G, output)
 
 
 if __name__ == '__main__':
@@ -30,6 +30,6 @@ if __name__ == '__main__':
     # Networkx tool doesn't support directed graph degree centrality
     digraph = 'false'
 
-    degree_centrality(in_graph.encode('utf-8'), multigraph, multi_attr, output.encode('utf-8'), digraph)
+    degree_centrality(in_graph, multigraph, multi_attr, output, digraph)
 
 
