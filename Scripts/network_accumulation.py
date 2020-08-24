@@ -1,7 +1,5 @@
 import arcpy
 import networkx as nx
-import osgeo
-import os
 
 arcpy.env.overwriteOutput = True
 input_shp = arcpy.GetParameterAsText(0)
