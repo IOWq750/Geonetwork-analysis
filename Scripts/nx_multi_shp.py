@@ -14,6 +14,7 @@ See https://en.wikipedia.org/wiki/Shapefile for additional information.
 """
 import networkx as nx
 import os
+from osgeo import osr
 
 
 __all__ = ['read_shp', 'write_shp']
@@ -91,6 +92,9 @@ def read_shp(path, unique_attribute, simplify=True, geom_attrs=True, strict=True
 
     net = nx.MultiDiGraph()
     shp = ogr.Open(path)
+    layer = shp.GetLayer()
+    spatialRef = str(layer.GetSpatialRef())
+    net.graph['crs'] = spatialRef
     if shp is None:
         raise RuntimeError("Unable to open {}".format(path))
     for field_name in shp:
@@ -216,6 +220,7 @@ def write_shp(G, unique_attribute, outdir):
     .. [1] https://en.wikipedia.org/wiki/Shapefile
     """
     os.environ['SHAPE_ENCODING'] = "cp1251"
+    srs = osr.SpatialReference(G.graph['crs'])
     try:
         from osgeo import ogr
     except ImportError:
@@ -284,7 +289,7 @@ def write_shp(G, unique_attribute, outdir):
         shpdir.DeleteLayer("nodes")
     except:
         pass
-    nodes = shpdir.CreateLayer("nodes", None, ogr.wkbPoint)
+    nodes = shpdir.CreateLayer("nodes", srs, ogr.wkbPoint)
 
     # Storage for node field names and their data types
     node_fields = {}
@@ -315,7 +320,7 @@ def write_shp(G, unique_attribute, outdir):
         shpdir.DeleteLayer("edges")
     except:
         pass
-    edges = shpdir.CreateLayer("edges", None, ogr.wkbLineString)
+    edges = shpdir.CreateLayer("edges", srs, ogr.wkbLineString)
 
     # New edge attribute write support merged into edge loop
     edge_fields = {}      # storage for field names and their data types

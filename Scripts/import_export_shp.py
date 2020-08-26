@@ -52,7 +52,7 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
 
 
 def export_path_to_shp(G, multy, multy_attribute, output_workspace, path_dict):
-    new_graph = nx.MultiGraph()
+    new_graph = nx.MultiGraph(crs=G.graph['crs'])
     a = 0
     for node in path_dict:
         path_list = path_dict[node]

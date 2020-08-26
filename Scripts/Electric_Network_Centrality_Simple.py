@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
 import networkx as nx
-import ogr
+from osgeo import ogr, osr
 import import_export_shp as aux_ie
 
-os.chdir(r'F:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia')
-power_lines = 'Lines_p.shp'
-power_points = 'Points_p.shp'
-path_output = 'Output'
+
 def el_centrality(power_lines, power_points, path_output):
     G_network = aux_ie.convert_shp_to_graph(power_lines, "false", "true", "Name")
     G_points = nx.read_shp(power_points)
@@ -30,26 +27,56 @@ def el_centrality(power_lines, power_points, path_output):
 
 
 def create_cpg(shapefile):
+    """Encoding description file creation"""
     with open('{}.cpg'.format(shapefile), 'w') as cpg:
         cpg.write('cp1251')
 
 
 def process_layer(layer):
+    """Merging features by name"""
     grouped_features = {}
+    geom_field = ogr.FieldDefn("Geometry", ogr.OFTString)
+    geom_field.SetWidth(50)
+    layer.CreateField(geom_field)
+    feature_names = []
     for feature in layer:
-        feature_name = feature.GetField('NAME')
-        if feature_name in grouped_features:
-            grouped_features[feature_name] += [feature]
+        feature_name = feature.GetField('name')
+        if feature_name not in feature_names:
+            expression = "name = '" + feature_name + "'"
+            layer.SetAttributeFilter(expression)
+            print(expression)
+            feature_count = layer.GetFeatureCount()
+            geom = feature.GetGeometryRef()
+            centroid = geom.Centroid().ExportToWkt()
+            print(centroid)
+            feature.SetField(geom_field, str(123)) #str(centroid)
+            feature_names.append(feature_name)
         else:
-            grouped_features[feature_name] = [feature]
-    records = []
-    for feature_name in grouped_features:
-        record = {}
-        record['name'] = feature_name
-        record['geometry'] = merge_features_geometry(grouped_features[feature_name])
-        record['count'] = len(grouped_features[feature_name])
-        records.append(record)
-    return records
+            continue
+        print(feature_count)
+        layer.SetAttributeFilter("FID > -1")
+        feature_geom = feature.GetGeometryRef()
+
+
+# def process_layer(layer):
+#     """Merging features by name"""
+#     grouped_features = {}
+#     for feature in layer:
+#         feature_geom = feature.GetGeometryRef()
+#         feature_name = feature.GetField('name')
+#         if feature_name in grouped_features:
+#             grouped_features[feature_name] += [feature]
+#         else:
+#             grouped_features[feature_name] = [feature]
+#     print(grouped_features)
+#     records = []
+#     for feature_name in grouped_features:
+#         record = {}
+#         record['name'] = feature_name
+#         record['geometry'] = merge_features_geometry(grouped_features[feature_name])
+#         record['count'] = len(grouped_features[feature_name])
+#         records.append(record)
+#     return records
 
 
 def simplify(features):
@@ -80,14 +107,25 @@ def merge_features_geometry(features):
         multiline.AddGeometry(feature.GetGeometryRef())
     return multiline
 
-el_centrality(power_lines, power_points, path_output)
 
+os.chdir(r'F:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia')
+power_lines = 'Lines_p.shp'
+power_points = 'Points_p.shp'
+path_output = 'Output'
+# driver = ogr.GetDriverByName('ESRI Shapefile')
+# dataSource = driver.Open(power_lines, 1)
+# src_layer = dataSource.GetLayer()
+# source_prj = src_layer.GetSpatialRef()
+# print(source_prj)
+
+
+el_centrality(power_lines, power_points, path_output)
 edges = os.path.join(path_output, 'edges.shp')
 create_cpg(edges)
 driver = ogr.GetDriverByName('ESRI Shapefile')
-dataSource = driver.Open(edges)
-src_layer = dataSource.GetLayer()
-records = process_layer(src_layer)
+dataSource = driver.Open(edges, 1)
+layer = dataSource.GetLayer()
+records = process_layer(layer)
 
 data_source = driver.CreateDataSource(os.path.join(path_output, 'el_centrality.shp'))
 dst_layer = data_source.CreateLayer(edges, None, ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
