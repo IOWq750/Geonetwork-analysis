@@ -32,92 +32,50 @@ def create_cpg(shapefile):
         cpg.write('cp1251')
 
 
-def process_layer(layer):
-    """Merging features by name"""
-    grouped_features = {}
-    geom_field = ogr.FieldDefn("Geometry", ogr.OFTString)
-    geom_field.SetWidth(50)
-    layer.CreateField(geom_field)
-    feature_names = []
-    for feature in layer:
-        feature_name = feature.GetField('name')
-        if feature_name not in feature_names:
-            expression = "name = '" + feature_name + "'"
-            layer.SetAttributeFilter(expression)
-            print(expression)
-            feature_count = layer.GetFeatureCount()
-            geom = feature.GetGeometryRef()
-            centroid = geom.Centroid().ExportToWkt()
-            print(centroid)
-            feature.SetField(geom_field, str(123)) #str(centroid)
-            feature_names.append(feature_name)
-        else:
-            continue
-        print(feature_count)
-        layer.SetAttributeFilter("FID > -1")
-        feature_geom = feature.GetGeometryRef()
-
-
-# def process_layer(layer):
-#     """Merging features by name"""
-#     grouped_features = {}
-#     for feature in layer:
-#         feature_geom = feature.GetGeometryRef()
-#         feature_name = feature.GetField('name')
-#         if feature_name in grouped_features:
-#             grouped_features[feature_name] += [feature]
-#         else:
-#             grouped_features[feature_name] = [feature]
-#     print(grouped_features)
-#     records = []
-#     for feature_name in grouped_features:
-#         record = {}
-#         record['name'] = feature_name
-#         record['geometry'] = merge_features_geometry(grouped_features[feature_name])
-#         record['count'] = len(grouped_features[feature_name])
-#         records.append(record)
-#     return records
-
-
-def simplify(features):
-    threshold = 10
-    for x in range(len(features) - 1):
-        if not features[x]:
-            continue
-        for y in range(x + 1, len(features)):
-            if not features[y]:
-                continue
-            coord_lst = features[x].GetGeometryRef().GetPoints() + features[y].GetGeometryRef().GetPoints()
-            points = []
-            for coords in coord_lst:
-                point = ogr.Geometry(ogr.wkbPoint)
-                point.AddPoint(*coords)
-                points.append(point)
-            if (points[0].Distance(points[2]) < threshold and points[1].Distance(points[3]) < threshold) or (
-                    points[1].Distance(points[2]) < threshold and points[0].Distance(points[3]) < threshold):
-                features[y] = None
-    features = list(filter(lambda a: a, features))
-    return features
-
-
 def merge_features_geometry(features):
-    features = simplify(features)
     multiline = ogr.Geometry(ogr.wkbMultiLineString)
     for feature in features:
         multiline.AddGeometry(feature.GetGeometryRef())
     return multiline
 
 
+def process_layer(layer):
+    """Grouping features by name and centroid coordinates"""
+    geom_field = ogr.FieldDefn('centroid', ogr.OFTString)
+    geom_field.SetWidth(100)
+    layer.CreateField(geom_field)
+    for feature in layer:
+        geom = feature.GetGeometryRef()
+        centroid = geom.Centroid().ExportToWkt()
+        feature.SetField("centroid", centroid)
+        feature_name = feature.GetField('name')
+        feature.SetField("name", feature_name)
+        layer.SetFeature(feature)
+    layer.ResetReading()
+    grouped_features = {}
+    for feature in layer:
+        feature_name = feature.GetField('name')
+        feature_centroid = feature.GetField('centroid')
+        groupby = (feature_name, feature_centroid)
+        if groupby in grouped_features:
+            grouped_features[groupby] += [feature]
+        else:
+            grouped_features[groupby] = [feature]
+    dissolved_features = []
+    for groupby in grouped_features:
+        dissolved_feature = {}
+        dissolved_feature['name'] = groupby[0]
+        dissolved_feature['centroid'] = groupby[1]
+        dissolved_feature['geometry'] = merge_features_geometry(grouped_features[groupby])
+        dissolved_feature['count'] = len(grouped_features[groupby])
+        dissolved_features.append(dissolved_feature)
+    return dissolved_features
+
+
 os.chdir(r'F:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia')
 power_lines = 'Lines_p.shp'
 power_points = 'Points_p.shp'
 path_output = 'Output'
-# driver = ogr.GetDriverByName('ESRI Shapefile')
-# dataSource = driver.Open(power_lines, 1)
-# src_layer = dataSource.GetLayer()
-# source_prj = src_layer.GetSpatialRef()
-# print(source_prj)
-
 
 el_centrality(power_lines, power_points, path_output)
 edges = os.path.join(path_output, 'edges.shp')
@@ -125,21 +83,24 @@ create_cpg(edges)
 driver = ogr.GetDriverByName('ESRI Shapefile')
 dataSource = driver.Open(edges, 1)
 layer = dataSource.GetLayer()
-records = process_layer(layer)
+spatialRef = str(layer.GetSpatialRef())
+dissolved_lines = process_layer(layer)
 
 data_source = driver.CreateDataSource(os.path.join(path_output, 'el_centrality.shp'))
-dst_layer = data_source.CreateLayer(edges, None, ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
+dst_layer = data_source.CreateLayer(edges, osr.SpatialReference(spatialRef), ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
 field_name = ogr.FieldDefn('name', ogr.OFTString)
-field_name.SetWidth(80)
+field_name.SetWidth(254)
 dst_layer.CreateField(field_name)
 dst_layer.CreateField(ogr.FieldDefn('count', ogr.OFTInteger))
+field_group = ogr.FieldDefn('centroid', ogr.OFTString)
+field_group.SetWidth(254)
+dst_layer.CreateField(field_group)
 
-for record in records:
+for line in dissolved_lines:
     feature = ogr.Feature(dst_layer.GetLayerDefn())
-    for key in record.keys():
+    for key in line.keys():
         if key == 'geometry':
-            feature.SetGeometry(record[key])
+            feature.SetGeometry(line[key])
         else:
-            feature.SetField(key, record[key])
+            feature.SetField(key, line[key])
     dst_layer.CreateFeature(feature)
-

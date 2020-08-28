@@ -1,17 +1,23 @@
 # -*- coding: utf-8 -*-
-import networkx as nx
-import os
+# Modified from https://gis.stackexchange.com/a/150001/2856
+from shapely.geometry import shape, mapping
+from shapely.ops import unary_union
+import fiona
+import itertools
+from operator import itemgetter
 
-directory = r'F:\YandexDisk\Projects\Python_Exercise\Pereslavl_shp'
-os.chdir(directory)
-G = nx.read_shp('Roads.shp').to_undirected()
-bc = nx.edge_betweenness_centrality(G)
-print(bc)
-delete_edge = []
-for edge in G.edges():
-    if bc[edge] > 0.2:
-        delete_edge.append(edge)
-G.remove_edges_from(delete_edge)
-bc = nx.edge_betweenness_centrality(G)
-nx.set_edge_attributes(G, bc, 'bc2')
-nx.write_shp(G, directory)
+
+def dissolve(input, output, fields):
+    with fiona.open(input) as input:
+        with fiona.open(output, 'w', **input.meta) as output:
+            grouper = itemgetter(*fields)
+            key = lambda k: grouper(k['properties'])
+            for k, group in itertools.groupby(sorted(input, key=key), key):
+                print(k)
+                print(group)
+                properties, geom = zip(*[(feature['properties'], shape(feature['geometry'])) for feature in group])
+                output.write({'geometry': mapping(unary_union(geom)), 'properties': properties[0]})
+
+
+if __name__ == '__main__':
+    dissolve(r'F:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia\New_Shapefile.shp', r'F:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia\Dissolve.shp', ["Id", "geometry"])
