@@ -22,9 +22,11 @@ def el_centrality(power_lines, power_points, path_output):
         if node in node_dict:
             if node_dict[node] == 'ЭС':
                 generation.add(node)
+    generation_count = len(generation)
+    substations_count = number_nodes - generation_count
     shortest_path = nx.multi_source_dijkstra_path(G_network, generation)
     aux_ie.export_path_to_shp(G_network, "true", path_output, shortest_path)
-    return number_nodes
+    return number_nodes, generation_count, substations_count
 
 
 def create_cpg(shapefile):
@@ -120,11 +122,10 @@ def feature_creation(layer, dissolved_lines):
         layer.CreateFeature(feature)
 
 
-def centrality_normalization(dst_layer, node_number):
-    for feature in dst_layer:
+def centrality_normalization(layer, node_number):
+    for feature in layer:
         count_field = feature.GetField('count')
-        el_cen = float(count_field) / float((node_number * (node_number - 1)))
-        print(el_cen)
+        el_cen = float(count_field) / (node_number * (node_number - 1))
         feature.SetField('El_Cen', el_cen)
         layer.SetFeature(feature)
 
@@ -135,7 +136,7 @@ if __name__ == "__main__":
     power_points = 'Points_p.shp'
     path_output = 'Output'
 
-    node_number = el_centrality(power_lines, power_points, path_output)
+    node_number = el_centrality(power_lines, power_points, path_output)[1]
     edges = os.path.join(path_output, 'edges.shp')
     create_cpg(edges)
     driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -154,8 +155,6 @@ if __name__ == "__main__":
     field_centroid = ogr.FieldDefn('centroid', ogr.OFTString)
     field_centroid.SetWidth(254)
     dst_layer.CreateField(field_centroid)
+    dst_layer.CreateField(ogr.FieldDefn('El_Cen', ogr.OFTReal))
     feature_creation(dst_layer, dissolved_lines)
-    field_el_centrality = ogr.FieldDefn('El_Cen', ogr.OFTReal)
-    field_el_centrality.SetPrecision(5)
-    dst_layer.CreateField(field_el_centrality)
     centrality_normalization(dst_layer, node_number)
