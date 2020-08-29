@@ -39,19 +39,20 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
     return graph
 
 
-# def export_path_to_shp(G, multy, multy_attribute, output_workspace):
-#     """Export of path (list of nodes) through graph to shapefile"""
-#     for item in ['edges.shp', 'nodes,shp']:
-#         filename = os.path.join(output_workspace, item)
-#         if os.path.exists(filename):
-#             os.remove(filename)
-#     if multy == 'true':
-#         nx_multi_shp.write_shp(G, multy_attribute, output_workspace)
-#     else:
-#         nx.write_shp(G, output_workspace)
+def export_graph_to_shp(G, multy, multy_attribute, output_workspace):
+    """Export graph to shapefile"""
+    for item in ['edges.shp', 'nodes,shp']:
+        filename = os.path.join(output_workspace, item)
+        if os.path.exists(filename):
+            os.remove(filename)
+    if multy == 'true':
+        nx_multi_shp.write_shp(G, multy_attribute, output_workspace)
+    else:
+        nx.write_shp(G, output_workspace)
 
 
-def export_path_to_shp(G, multy, multy_attribute, output_workspace, path_dict):
+def export_path_to_shp(G, multy, output_workspace, path_dict):
+    """Export of path (list of nodes) through graph to shapefile"""
     new_graph = nx.MultiGraph(crs=G.graph['crs'])
     a = 0
     for node in path_dict:

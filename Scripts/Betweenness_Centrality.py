@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: CP1251 -*-
 import networkx as nx
 import os
 import sys
@@ -20,13 +20,16 @@ def edge_betweenness_centrality(G, normalization, weight):
     return ebc
 
 
-def betweenness_multiedge_distribution(G, ebc):
+def betweenness_multiedge_distribution(G, ebc, distributed):
     """Distribution of value equally between parallel edges in multigraph"""
     multiedges = [(element[0], element[1]) for element in G.edges(keys=True)]
     edge_betweenness_values = {}
     for edge in multiedges:
         count = multiedges.count(edge)
-        betweenness = ebc[edge]/count
+        if distributed == 'true':
+            betweenness = ebc[edge]/count
+        else:
+            betweenness = ebc[edge]
         for item in G.edges(keys=True):
             if edge == tuple([item[0], item[1]]):
                 edge_betweenness_values[item] = betweenness
@@ -41,7 +44,7 @@ if __name__ == "__main__":
     weight = arcpy.GetParameterAsText(4)
     output = arcpy.GetParameterAsText(5)
     normalized = arcpy.GetParameterAsText(6)
-
+    distributed = arcpy.GetParameterAsText(7)
 
     G = aux_ie.convert_shp_to_graph(in_graph, digraph, multigraph, multi_attr)
     if normalized == 'false':
@@ -51,8 +54,8 @@ if __name__ == "__main__":
     node_betweenness_centrality(G, normalization, weight)
     ebc = edge_betweenness_centrality(G, normalization, weight)
     if multigraph == 'true':
-        betweenness_multiedge_distribution(G, ebc)
+        betweenness_multiedge_distribution(G, ebc, distributed)
     else:
         nx.set_edge_attributes(G, ebc, 'BC')
-    aux_ie.export_path_to_shp(G, multigraph, multi_attr, output)
+    aux_ie.export_graph_to_shp(G, multigraph, multi_attr, output)
 
