@@ -86,7 +86,7 @@ def dissolve_layer(layer, field_list, stats_dict):
     for groupby in grouped_features:
         dissolved_feature = {}
         for i in range(0, len(field_list)):
-            dissolved_feature[i] = groupby[i]
+            dissolved_feature[field_list[i]] = groupby[i]
         dissolved_feature['geometry'] = merge_features_geometry(grouped_features[groupby])
         for stats in stats_dict:
             if stats == 'count':
@@ -109,23 +109,22 @@ def betweenness_multiedge_distribution(G, ebc):
     nx.set_edge_attributes(G, edge_betweenness_values, 'BC')
 
 
-def feature_creation(dst_layer, dissolved_lines):
+def feature_creation(layer, dissolved_lines):
     for line in dissolved_lines:
-        feature = ogr.Feature(dst_layer.GetLayerDefn())
-        print(line.keys())
+        feature = ogr.Feature(layer.GetLayerDefn())
         for key in line.keys():
-            print(key)
             if key == 'geometry':
                 feature.SetGeometry(line[key])
             else:
                 feature.SetField(key, line[key])
-        dst_layer.CreateFeature(feature)
+        layer.CreateFeature(feature)
 
 
 def centrality_normalization(dst_layer, node_number):
     for feature in dst_layer:
         count_field = feature.GetField('count')
-        el_cen = float(count_field) / (node_number * (node_number - 1))
+        el_cen = float(count_field) / float((node_number * (node_number - 1)))
+        print(el_cen)
         feature.SetField('El_Cen', el_cen)
         layer.SetFeature(feature)
 
@@ -157,6 +156,6 @@ if __name__ == "__main__":
     dst_layer.CreateField(field_centroid)
     feature_creation(dst_layer, dissolved_lines)
     field_el_centrality = ogr.FieldDefn('El_Cen', ogr.OFTReal)
+    field_el_centrality.SetPrecision(5)
     dst_layer.CreateField(field_el_centrality)
     centrality_normalization(dst_layer, node_number)
-
