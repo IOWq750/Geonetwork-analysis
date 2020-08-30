@@ -60,15 +60,17 @@ def export_path_to_shp(G, multy, output_workspace, path_dict):
         path_list.insert(0, node)
         b = 0
         for edge in G.edges(keys=True, data=True):
-            data = new_graph.get_edge_data(*edge)
-            Wkt = data['Wkt']
+            attribute_data = new_graph.get_edge_data(*edge)
+            new_attribute_data = {}
+            Wkt = attribute_data['Wkt']
             c = 0
             for i in range(len(path_list) - 1):
                 identifier = str(a) + str(b) + str(c)
-                if tuple([tuple(path_list[i]), tuple(path_list[i + 1])]) == tuple([edge[0], edge[1]]):
+                if tuple([tuple(path_list[i]), tuple(path_list[i + 1])]) == tuple(edge[:2])\
+                        or tuple([tuple(path_list[i + 1]), tuple(path_list[i])]) == tuple(edge[:2]):
                     new_graph.add_edge(edge[0], edge[1], identifier, Name=edge[2], ident=identifier, Wkt=Wkt)
-                elif tuple([tuple(path_list[i + 1]), tuple(path_list[i])]) == tuple([edge[0], edge[1]]):
-                    new_graph.add_edge(edge[0], edge[1], identifier, Name=edge[2], ident=identifier, Wkt=Wkt)
+                    new_attribute_data[edge[0], edge[1], identifier] = attribute_data
+                    nx.set_edge_attributes(new_graph, new_attribute_data)
                 c += 1
             b += 1
         a += 1
