@@ -35,17 +35,10 @@ def create_cpg(shapefile):
         cpg.write('cp1251')
 
 
-def merge_features_geometry(features):
-    multiline = ogr.Geometry(ogr.wkbMultiLineString)
-    for feature in features:
-        multiline.AddGeometry(feature.GetGeometryRef())
-    return multiline
-
-
 def geometry_extraction(layer):
-    geom_field = ogr.FieldDefn('centroid', ogr.OFTString)
-    geom_field.SetWidth(100)
-    layer.CreateField(geom_field)
+    print(3)
+    layer.CreateField(ogr.FieldDefn('centroid', ogr.OFTString))
+    print(4)
     for feature in layer:
         geom = feature.GetGeometryRef()
         centroid = geom.Centroid().ExportToWkt()
@@ -89,7 +82,10 @@ def dissolve_layer(layer, field_list, stats_dict):
         dissolved_feature = {}
         for i in range(len(field_list)):
             dissolved_feature[field_list[i]] = groupby[i]
-        dissolved_feature['group'] = merge_features_geometry(grouped_features[groupby])
+        merged_line = ogr.Geometry(ogr.wkbMultiLineString)
+        for feature in grouped_features[groupby]:
+            merged_line.AddGeometry(feature.GetGeometryRef())
+        dissolved_feature['group'] = merged_line
         for stats in stats_dict:
             if stats == 'count':
                 dissolved_feature[stats] = len(grouped_features[groupby])
@@ -111,6 +107,44 @@ def feature_creation(layer, dissolved_lines):
             else:
                 feature.SetField(key, line[key])
         layer.CreateFeature(feature)
+
+
+def import_field_schema(layer, path_output, delete_fields=None):
+    """Import field list from input layer to the shapefile in path_output directory excluding the list of delete_fields\
+
+        Parameters
+        ----------
+        layer: datasource.GetLayer() object
+
+        path_output: string
+        directory of output shapefile
+
+        delete_fields: list (optional)
+        list of fields that should be excluded from final shp
+
+        Returns
+        -------
+        datasource.GetLayer() object of final shapefile, dictionary of field schema {fieldName: fieldType}
+    """
+
+    field_types_dict = {'Integer': ogr.OFTInteger,
+                        'Real': ogr.OFTReal,
+                        'String': ogr.OFTString}
+    fields = {}
+    layerDefinition = layer.GetLayerDefn()
+    for i in range(layerDefinition.GetFieldCount()):
+        field_name = layerDefinition.GetFieldDefn(i).GetName()
+        field_type = layerDefinition.GetFieldDefn(i).GetFieldTypeName(layerDefinition.GetFieldDefn(i).GetType())
+        fields[field_name] = field_type
+    for field in delete_fields:
+        del fields[field]
+    output_shp = os.path.join(path_output, 'el_centrality.shp')
+    out_ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(output_shp)
+    dst_layer = out_ds.CreateLayer('el_centrality.shp', osr.SpatialReference(str(layer.GetSpatialRef())),
+                                   ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
+    for key in fields:
+        dst_layer.CreateField(ogr.FieldDefn(key), field_types_dict[fields[key]])
+    return dst_layer, fields
 
 
 def centrality_normalization(layer, node_number):
@@ -142,37 +176,15 @@ if __name__ == "__main__":
     node_number = el_centrality(power_lines, power_points, 'Weight', path_output)[2]
     edges = os.path.join(path_output, 'edges.shp')
     create_cpg(edges)
-    dataSource = ogr.GetDriverByName('ESRI Shapefile').Open(edges, 1)
-    layer = dataSource.GetLayer()
+    layer = ogr.GetDriverByName('ESRI Shapefile').Open(edges, 1).GetLayer()
+    print(0)
     geometry_extraction(layer)
-    field_types_dict = {'Integer': ogr.OFTInteger,
-                        'Real': ogr.OFTReal,
-                        'String': ogr.OFTString}
-    fields = {}
-    layerDefinition = layer.GetLayerDefn()
-    for i in range(layerDefinition.GetFieldCount()):
-        field_name = layerDefinition.GetFieldDefn(i).GetName()
-        field_type = layerDefinition.GetFieldDefn(i).GetFieldTypeName(layerDefinition.GetFieldDefn(i).GetType())
-        fields[field_name] = field_type
-    del fields['ident']
+    print('e')
+    dst_layer, fields = import_field_schema(layer, path_output, ['ident'])
+    print('f')
     dissolved_lines = dissolve_layer(layer, fields.keys(), {'count': 'FID'})
-    output_shp = os.path.join(path_output, 'el_centrality.shp')
-    out_ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(output_shp)
-    dst_layer = out_ds.CreateLayer('el_centrality.shp', osr.SpatialReference(str(layer.GetSpatialRef())),
-                                   ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
-    for key in fields:
-        dst_layer.CreateField(ogr.FieldDefn(key), field_types_dict[fields[key]])
-    dst_layer.CreateField(ogr.FieldDefn('El_Cen'), ogr.OFTReal)
-    dst_layer.CreateField(ogr.FieldDefn('Count'), ogr.OFTReal)
-    temp = ogr.GetDriverByName('ESRI Shapefile').Open(output_shp, 1)
-    temp_layer = temp.GetLayer(0)
-    layerDefinition = temp_layer.GetLayerDefn()
-    feature_creation(dst_layer, dissolved_lines)
-    for i in range(layerDefinition.GetFieldCount()):
-        fieldName = layerDefinition.GetFieldDefn(i).GetName()
-        fieldTypeCode = layerDefinition.GetFieldDefn(i).GetType()
-        fieldType = layerDefinition.GetFieldDefn(i).GetFieldTypeName(fieldTypeCode)
-        print(fieldName, fieldType)
-
-    centrality_normalization(dst_layer, node_number)
-    #betweenness_multiedge_distribution()
+    print(111)
+    # dst_layer.CreateField(ogr.FieldDefn('El_Cen'), ogr.OFTReal)
+    # dst_layer.CreateField(ogr.FieldDefn('Count'), ogr.OFTReal)
+    # centrality_normalization(dst_layer, node_number)
+    # betweenness_multiedge_distribution()
