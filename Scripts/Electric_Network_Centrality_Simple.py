@@ -46,50 +46,6 @@ def geometry_extraction(layer):
     layer.ResetReading()
 
 
-# def import_field_schema(layer, output_shp, delete_fields=None, add_field=None):
-#     """Import field list from input layer to the shapefile in path_output directory excluding the list of delete_fields
-#
-#         Parameters
-#         ----------
-#         layer: datasource.GetLayer() object
-#
-#         output_shp: string
-#         directory of output shapefile
-#
-#         delete_fields: list (optional)
-#         list of fields that should be excluded from final shp
-#
-#         add_field: dictionary
-#         dictionary kind of {fieldname: fieldtype} to add in output datasource
-#
-#         Returns
-#         -------
-#         datasource.GetLayer() object of final shapefile, dictionary of field schema {fieldName: fieldType}
-#     """
-#
-#     output_fields = {}
-#     layer_definition = layer.GetLayerDefn()
-#     for i in range(layer_definition.GetFieldCount()):
-#         field_name = layer_definition.GetFieldDefn(i).GetName()
-#         field_type = layer_definition.GetFieldDefn(i).GetType()
-#         output_fields[field_name] = field_type
-#     if delete_fields is not None:
-#         for field in delete_fields:
-#             del output_fields[field]
-#     input_fields = output_fields.copy()
-#     if add_field is not None:
-#         for field in add_field:
-#             output_fields[field] = add_field[field]
-#     out_ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(output_shp)
-#     dst_layer = out_ds.CreateLayer(os.path.basename(output_shp), osr.SpatialReference(str(layer.GetSpatialRef())),
-#                                    ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
-#     for key in output_fields:
-#         new_field = ogr.FieldDefn(key)
-#         dst_layer.CreateField(new_field, output_fields[key])
-#         print(key, output_fields[key])
-#     return input_fields, output_fields, dst_layer
-
-
 def import_field_schema(layer, output_shp, delete_fields=None, add_field=None):
     """Import field list from input layer to the shapefile in path_output directory excluding the list of delete_fields
 
@@ -115,27 +71,19 @@ def import_field_schema(layer, output_shp, delete_fields=None, add_field=None):
     dst_layer = out_ds.CreateLayer(os.path.basename(output_shp), osr.SpatialReference(str(layer.GetSpatialRef())),
                                    ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
     dst_layer.CreateFields(layer.schema)
-    output_fields = {}
+    in_fields = []
     layer_definition = layer.GetLayerDefn()
     for i in range(layer_definition.GetFieldCount()):
         field_name = layer_definition.GetFieldDefn(i).GetName()
-        field_type = layer_definition.GetFieldDefn(i).GetType()
-        output_fields[field_name] = field_type
-    if delete_fields is not None:
-        for field in delete_fields:
-            del output_fields[field]
-    input_fields = output_fields.copy()
+        in_fields.append(field_name)
+    for field_name in in_fields:
+        if field_name in delete_fields:
+            layer.DeleteField(layer_definition.GetFieldIndex(field_name))
+            in_fields.remove(field_name)
     if add_field is not None:
         for field in add_field:
-            output_fields[field] = add_field[field]
-    out_ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(output_shp)
-    dst_layer = out_ds.CreateLayer(os.path.basename(output_shp), osr.SpatialReference(str(layer.GetSpatialRef())),
-                                   ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
-    for key in output_fields:
-        new_field = ogr.FieldDefn(key)
-        dst_layer.CreateField(new_field, output_fields[key])
-        print(key, output_fields[key])
-    return input_fields, output_fields, dst_layer
+            dst_layer.CreateField(ogr.FieldDefn(field, add_field[field]))
+    return dst_layer, in_fields
 
 
 def dissolve_layer(layer, field_list, stats_dict=None):
@@ -179,7 +127,7 @@ def dissolve_layer(layer, field_list, stats_dict=None):
         dissolved_feature['group'] = merged_line
         if stats_dict is not None:
             for stats in stats_dict:
-                if stats == 'count':
+                if stats == 'COUNT':
                     dissolved_feature[stats] = len(grouped_features[groupby])
                 # if stats == 'sum':
                 #     dissolved_feature[stats] = sum([feature.GetField(stats_dict[stats]) for feature in grouped_features[groupby]])
@@ -204,7 +152,7 @@ def centrality_normalization(shp, node_number):
     out_ds = ogr.GetDriverByName('ESRI Shapefile').Open(shp, 1)
     layer = out_ds.GetLayer()
     for feature in layer:
-        count_field = feature.GetField('count')
+        count_field = feature.GetField('COUNT')
         print(count_field)
         el_cen = float(count_field) / (node_number * (node_number - 1))
         feature.SetField('El_Cen', el_cen)
@@ -236,10 +184,9 @@ if __name__ == "__main__":
     data_source = ogr.GetDriverByName('ESRI Shapefile').Open(edges, 1)
     layer = data_source.GetLayer()
     geometry_extraction(layer)
-    in_fields, out_fields, dst_layer = import_field_schema(layer, output_shp, ['ident'],
-                                                           {'count': ogr.OFTInteger, 'El_Cen': ogr.OFTReal})
-    # out_lyr.CreateFields(in_lyr.schema)
-    dissolved_lines = dissolve_layer(layer, in_fields.keys(), {'FID': 'count'})
+    dst_layer, in_fields = import_field_schema(layer, output_shp, ['ident'],
+                                                           {'COUNT': ogr.OFTInteger, 'El_Cen': ogr.OFTReal})
+    dissolved_lines = dissolve_layer(layer, in_fields, {'COUNT': 'FID'})
     feature_creation(output_shp, dissolved_lines)
     centrality_normalization(output_shp, node_count)
     # betweenness_multiedge_distribution()
