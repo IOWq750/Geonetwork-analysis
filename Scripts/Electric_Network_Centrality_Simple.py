@@ -23,10 +23,10 @@ def el_centrality(power_lines, power_points, weight, output_workspace):
             if node_dict[node] == 'ЭС':
                 generation.add(node)
     generation_count = len(generation)
-    substations_count = number_nodes - generation_count
+    substation_count = number_nodes - generation_count
     shortest_path = nx.multi_source_dijkstra_path(G_network, generation, weight=weight)
     aux_ie.export_path_to_shp(G_network, "true", output_workspace, shortest_path)
-    return number_nodes, generation_count, substations_count
+    return number_nodes, generation_count, substation_count
 
 
 def create_cpg(shapefile):
@@ -148,13 +148,12 @@ def feature_creation(output_shp, dissolved_lines):
         layer.CreateFeature(feature)
 
 
-def centrality_normalization(shp, node_number):
+def centrality_normalization(shp, node_number, generation_count):
     out_ds = ogr.GetDriverByName('ESRI Shapefile').Open(shp, 1)
     layer = out_ds.GetLayer()
     for feature in layer:
         count_field = feature.GetField('COUNT')
-        print(count_field)
-        el_cen = float(count_field) / (node_number * (node_number - 1))
+        el_cen = float(count_field) / ((node_number * (node_number - 1)) - generation_count * (generation_count - 1))
         feature.SetField('El_Cen', el_cen)
         layer.SetFeature(feature)
 
@@ -188,5 +187,5 @@ if __name__ == "__main__":
                                                            {'COUNT': ogr.OFTInteger, 'El_Cen': ogr.OFTReal})
     dissolved_lines = dissolve_layer(layer, in_fields, {'COUNT': 'FID'})
     feature_creation(output_shp, dissolved_lines)
-    centrality_normalization(output_shp, node_count)
+    centrality_normalization(output_shp, node_count, generation_count)
     # betweenness_multiedge_distribution()
