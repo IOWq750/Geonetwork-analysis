@@ -5,8 +5,37 @@ from osgeo import ogr, osr
 import import_export_shp as aux_ie
 
 
-def el_centrality(power_lines, power_points, weight, output_workspace):
-    G_network = aux_ie.convert_shp_to_graph(power_lines, "false", "true", "Name")
+def el_centrality(power_lines, power_points, name, weight, voltage, output_workspace):
+    """ Calculation of electrical network centrality as a number of shortest paths between each substation and
+    topologically closest generation points.
+
+            Parameters
+            ----------
+            power_lines: str
+                 path to the polyline shapefile with all power lines
+
+            power_points: str
+                path to the point shapefile with all power points (substations, generation) with attribute 'Point_Type',
+                all generation points have value 'ЭС', all substations have values 'ПС'
+
+            name: str
+                name field for power lines as a third key for multigraph
+
+            weight: str
+                weight field name for power lines (inverted capacity)
+
+            voltage: str
+                voltage field name for power lines
+
+            output_workspace: str
+                path to the output directory
+
+            Returns
+            -------
+            number of nodes (original power points without orphan links), number of generation points,
+            number of substation points"""
+
+    G_network = aux_ie.convert_shp_to_graph(power_lines, "false", "true", name)
     G_points = nx.read_shp(power_points)
     number_nodes = int(G_points.number_of_nodes())
     dict_point_type = {}
@@ -24,19 +53,33 @@ def el_centrality(power_lines, power_points, weight, output_workspace):
                 generation.add(node)
     generation_count = len(generation)
     substation_count = number_nodes - generation_count
-    G_network = trace_lines(G_network)
+    G_network, trace_dict = trace_lines(G_network, voltage)  # Conversion of trace_dict is not implemented
     shortest_path = nx.multi_source_dijkstra_path(G_network, generation, weight=weight)
     aux_ie.export_path_to_shp(G_network, "true", output_workspace, shortest_path)
     return number_nodes, generation_count, substation_count
 
 
-def trace_lines(G_network):
+def trace_lines(G_network, voltage):
+    """Tracing all existing lines in graph and appending them to the dictionary, calculation of the number of
+    parallel edges with the same voltage class, appending this data as attribute of edge
+
+            Parameters
+            ----------
+            G_network : networkx graph
+               name of graph, voltage of the line should be in appropriate attribute field
+
+            voltage: str
+                voltage field name for power lines
+
+            Returns
+            -------
+            networkx graph and tracing dictionary as {node: (start, end)}"""
     trace_dict = {}
     line_dict = {}
     for line in G_network.edges(data=True):
         start_end = line[:2]
-        item = (start_end, line[2]['Voltage'])
-        item_inverted = (start_end[1], start_end[0], line[2]['Voltage'])
+        item = (start_end, line[2][voltage])
+        item_inverted = (start_end[1], start_end[0], line[2][voltage])
         if item not in line_dict and item_inverted not in line_dict:
             line_dict[item] = 1
             trace_dict[start_end[0]] = [start_end[0], start_end[1]]
@@ -45,11 +88,11 @@ def trace_lines(G_network):
     circuit_dict = {}
     for line in G_network.edges(keys=True, data=True):
         try:
-            circuit_dict[line[:3]] = line_dict[(line[:2], line[3]['Voltage'])]
+            circuit_dict[line[:3]] = line_dict[(line[:2], line[3][voltage])]
         except:
-            circuit_dict[line[:3]] = line_dict[line[1], line[0], line[3]['Voltage']]
+            circuit_dict[line[:3]] = line_dict[line[1], line[0], line[3][voltage]]
     nx.set_edge_attributes(G_network, circuit_dict, 'Circ_Count')
-    return G_network
+    return G_network, trace_dict
 
 
 def create_cpg(shapefile):
@@ -173,6 +216,23 @@ def feature_creation(output_shp, dissolved_lines):
 
 
 def centrality_normalization(shp, node_number, generation_count):
+    """Normalization of centrality values by the number of possible links between substations and generation;
+    distributon of normalized values equally between parallel edges of the same voltage class
+
+        Parameters
+        ----------
+        shp: shapefile
+           path to the shapefile with calculated centrality.
+
+        node_number: int
+            number of power points in network
+
+        generation_count: int
+            number of generation points in network
+
+        Returns
+        -------
+        None"""
     out_ds = ogr.GetDriverByName('ESRI Shapefile').Open(shp, 1)
     layer = out_ds.GetLayer()
     for feature in layer:
@@ -193,7 +253,8 @@ if __name__ == "__main__":
 
     output_shp = os.path.join(path_output, 'el_centrality.shp')
     edges = os.path.join(path_output, 'edges.shp')
-    node_count, generation_count, substation_count = el_centrality(power_lines, power_points, 'Weight', path_output)
+    node_count, generation_count, substation_count = el_centrality(power_lines, power_points, 'Name',
+                                                                   'Weight', 'Voltage', path_output)
     create_cpg(edges)
     data_source = ogr.GetDriverByName('ESRI Shapefile').Open(edges, 1)
     layer = data_source.GetLayer()
