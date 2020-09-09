@@ -24,9 +24,32 @@ def el_centrality(power_lines, power_points, weight, output_workspace):
                 generation.add(node)
     generation_count = len(generation)
     substation_count = number_nodes - generation_count
+    G_network = trace_lines(G_network)
     shortest_path = nx.multi_source_dijkstra_path(G_network, generation, weight=weight)
     aux_ie.export_path_to_shp(G_network, "true", output_workspace, shortest_path)
     return number_nodes, generation_count, substation_count
+
+
+def trace_lines(G_network):
+    trace_dict = {}
+    line_dict = {}
+    for line in G_network.edges(data=True):
+        start_end = line[:2]
+        item = (start_end, line[2]['Voltage'])
+        item_inverted = (start_end[1], start_end[0], line[2]['Voltage'])
+        if item not in line_dict and item_inverted not in line_dict:
+            line_dict[item] = 1
+            trace_dict[start_end[0]] = [start_end[0], start_end[1]]
+        else:
+            line_dict[item] += 1
+    circuit_dict = {}
+    for line in G_network.edges(keys=True, data=True):
+        try:
+            circuit_dict[line[:3]] = line_dict[(line[:2], line[3]['Voltage'])]
+        except:
+            circuit_dict[line[:3]] = line_dict[line[1], line[0], line[3]['Voltage']]
+    nx.set_edge_attributes(G_network, circuit_dict, 'Circ_Count')
+    return G_network
 
 
 def create_cpg(shapefile):
@@ -72,13 +95,14 @@ def import_field_schema(layer, output_shp, delete_fields=None, add_field=None):
                                    ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
     dst_layer.CreateFields(layer.schema)
     in_fields = []
-    layer_definition = layer.GetLayerDefn()
-    for i in range(layer_definition.GetFieldCount()):
-        field_name = layer_definition.GetFieldDefn(i).GetName()
+    layer_definition_in = layer.GetLayerDefn()
+    layer_definition_out = dst_layer.GetLayerDefn()
+    for i in range(layer_definition_in.GetFieldCount()):
+        field_name = layer_definition_in.GetFieldDefn(i).GetName()
         in_fields.append(field_name)
     for field_name in in_fields:
         if field_name in delete_fields:
-            layer.DeleteField(layer_definition.GetFieldIndex(field_name))
+            dst_layer.DeleteField(layer_definition_out.GetFieldIndex(field_name))
             in_fields.remove(field_name)
     if add_field is not None:
         for field in add_field:
@@ -153,21 +177,12 @@ def centrality_normalization(shp, node_number, generation_count):
     layer = out_ds.GetLayer()
     for feature in layer:
         count_field = feature.GetField('COUNT')
+        count_circuit = feature.GetField('Circ_Count')
         el_cen = float(count_field) / ((node_number * (node_number - 1)) - generation_count * (generation_count - 1))
+        el_centrality_distributed = el_cen/count_circuit
         feature.SetField('El_Cen', el_cen)
+        feature.SetField('El_C_Distr', el_centrality_distributed)
         layer.SetFeature(feature)
-
-
-def betweenness_multiedge_distribution(G, ebc):
-    """Distribution of value between parallel edges in multigraph"""
-    multiedges = [(element[0], element[1]) for element in G.edges(keys=True)]
-    edge_betweenness_values = {}
-    for edge in multiedges:
-        betweenness = ebc[edge]
-        for item in G.edges(keys=True):
-            if edge == tuple([item[0], item[1]]):
-                edge_betweenness_values[item] = betweenness
-    nx.set_edge_attributes(G, edge_betweenness_values, 'BC')
 
 
 if __name__ == "__main__":
@@ -183,9 +198,9 @@ if __name__ == "__main__":
     data_source = ogr.GetDriverByName('ESRI Shapefile').Open(edges, 1)
     layer = data_source.GetLayer()
     geometry_extraction(layer)
-    dst_layer, in_fields = import_field_schema(layer, output_shp, ['ident'],
-                                                           {'COUNT': ogr.OFTInteger, 'El_Cen': ogr.OFTReal})
+    dst_layer, in_fields = import_field_schema(layer, output_shp, ['ident', 'Geometry'], {'COUNT': ogr.OFTInteger,
+                                                                              'El_Cen': ogr.OFTReal,
+                                                                              'El_C_Distr': ogr.OFTReal})
     dissolved_lines = dissolve_layer(layer, in_fields, {'COUNT': 'FID'})
     feature_creation(output_shp, dissolved_lines)
     centrality_normalization(output_shp, node_count, generation_count)
-    # betweenness_multiedge_distribution()

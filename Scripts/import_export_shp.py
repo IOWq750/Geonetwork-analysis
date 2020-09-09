@@ -65,7 +65,7 @@ def export_path_to_shp(G, multy, output_workspace, path_dict):
             Wkt = attribute_data['Wkt']
             c = 0
             for i in range(len(path_list) - 1):
-                identifier = str(a) + str(b) + str(c)
+                identifier = str(a) + '_' + str(b) + '_' + str(c)
                 if tuple([tuple(path_list[i]), tuple(path_list[i + 1])]) == tuple(edge[:2])\
                         or tuple([tuple(path_list[i + 1]), tuple(path_list[i])]) == tuple(edge[:2]):
                     new_graph.add_edge(edge[0], edge[1], identifier, Name=edge[2], ident=identifier, Wkt=Wkt)
