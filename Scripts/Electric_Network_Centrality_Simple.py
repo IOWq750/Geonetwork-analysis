@@ -112,65 +112,43 @@ def geometry_extraction(layer):
     layer.ResetReading()
 
 
-def import_field_schema(layer, output_shp, delete_fields=None, add_field=None):
-    """Import field list from input layer to the shapefile in path_output directory excluding the list of delete_fields
+def dissolve_layer(layer, output_shp, input_fields=None, delete_fields=None, add_fields=None, stats_dict=None):
+    """Grouping features by attribute values in input fields and optionally calculation of statistics. If input fields
+    set as None, all existing fields will be accounted in dissolving except the list of delete fields
 
         Parameters
         ----------
-        layer: datasource.GetLayer() object
-
-        output_shp: string
-        directory of output shapefile
-
-        delete_fields: list (optional)
-        list of fields that should be excluded from final shp
-
-        add_field: dictionary
-        dictionary kind of {fieldname: fieldtype} to add in output datasource
-
-        Returns
-        -------
-        datasource.GetLayer() object of final shapefile, dictionary of field schema {fieldName: fieldType}
-    """
-
-    out_ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(output_shp)
-    dst_layer = out_ds.CreateLayer(os.path.basename(output_shp), osr.SpatialReference(str(layer.GetSpatialRef())),
-                                   ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
-    dst_layer.CreateFields(layer.schema)
-    in_fields = []
-    layer_definition_in = layer.GetLayerDefn()
-    layer_definition_out = dst_layer.GetLayerDefn()
-    for i in range(layer_definition_in.GetFieldCount()):
-        field_name = layer_definition_in.GetFieldDefn(i).GetName()
-        in_fields.append(field_name)
-    for field_name in in_fields:
-        if field_name in delete_fields:
-            dst_layer.DeleteField(layer_definition_out.GetFieldIndex(field_name))
-            in_fields.remove(field_name)
-    if add_field is not None:
-        for field in add_field:
-            dst_layer.CreateField(ogr.FieldDefn(field, add_field[field]))
-    return dst_layer, in_fields
-
-
-def dissolve_layer(layer, field_list, stats_dict=None):
-    """Grouping features by name and centroid coordinates
-
-        Parameters
-        ----------
-        layer : ogr layer of a shapefile
+        layer: ogr layer object
            name of layer to read.
 
-        field_list: list
+        output_shp: str
+            Output shapefile path with dissolved features
+
+        input_fields: list
             Attributes in shapefile for dissolving by their unique values
 
-        stats_dict:  dictionary (optional)
+        delete_fields: list
+            Attributes in shapefile which should be deleted in output shapefile
+
+        add_fields: dict
+            dictionary kind of {fieldname: fieldtype} to add in output shapefile
+
+        stats_dict: dict
             keys – name of attribute fields for statistics calculation, values – type of statistics
+            valid types of statistics:
+            COUNT – number of dissolved features
+            SUM – sum of dissolved features values
+            MIN – min of dissolved features values
+            MAX – max of dissolved features values
+            AVE – average of dissolved features values
 
         Returns
         -------
-        list of features grouped by attribute values"""
+        None"""
 
+    for stats in stats_dict:
+        add_fields[(stats + stats_dict[stats])[:10]] = ogr.OFTInteger
+    field_list = import_field_schema(layer, output_shp, input_fields, delete_fields, add_fields)
     grouped_features = {}
     for feature in layer:
         groupby = []
@@ -195,29 +173,82 @@ def dissolve_layer(layer, field_list, stats_dict=None):
         if stats_dict is not None:
             for stats in stats_dict:
                 if stats == 'COUNT':
-                    dissolved_feature[stats] = len(grouped_features[groupby])
-                # if stats == 'sum':
-                #     dissolved_feature[stats] = sum([feature.GetField(stats_dict[stats]) for feature in grouped_features[groupby]])
+                    dissolved_feature[(stats + stats_dict[stats])[:10]] = len(grouped_features[groupby])
+                if stats == 'SUM':
+                    dissolved_feature[(stats + stats_dict[stats])[:10]] = sum([feature.GetField(stats_dict[stats]) for
+                                                                               feature in grouped_features[groupby]])
+                if stats == 'MIN':
+                    dissolved_feature[(stats + stats_dict[stats])[:10]] = min([feature.GetField(stats_dict[stats]) for
+                                                                               feature in grouped_features[groupby]])
+                if stats == 'MAX':
+                    dissolved_feature[(stats + stats_dict[stats])[:10]] = max([feature.GetField(stats_dict[stats]) for
+                                                                               feature in grouped_features[groupby]])
+                if stats == 'AVE':
+                    dissolved_feature[(stats + stats_dict[stats])[:10]] = sum([feature.GetField(stats_dict[stats]) for
+                                            feature in grouped_features[groupby]])/float(len(grouped_features[groupby]))
         dissolved_features.append(dissolved_feature)
-    return dissolved_features
-
-
-def feature_creation(output_shp, dissolved_lines):
     out_ds = ogr.GetDriverByName('ESRI Shapefile').Open(output_shp, 1)
-    layer = out_ds.GetLayer()
-    for line in dissolved_lines:
-        feature = ogr.Feature(layer.GetLayerDefn())
-        for key in line.keys():
+    out_layer = out_ds.GetLayer()
+    for item in dissolved_features:
+        feature = ogr.Feature(out_layer.GetLayerDefn())
+        for key in item.keys():
             if key == 'group':
-                feature.SetGeometry(line[key])
+                feature.SetGeometry(item[key])
             else:
-                feature.SetField(key, line[key])
-        layer.CreateFeature(feature)
+                feature.SetField(key, item[key])
+        out_layer.CreateFeature(feature)
+
+
+def import_field_schema(layer, output_shp, input_fields=None, delete_fields=None, add_field=None):
+    """Import field list from input layer to the shapefile in path_output directory excluding the list of delete_fields
+
+        Parameters
+        ----------
+        layer: datasource.GetLayer() object
+
+        output_shp: string
+        directory of output shapefile
+
+        delete_fields: list (optional)
+        list of fields that should be excluded from final shp
+
+        add_field: dictionary
+        dictionary kind of {fieldname: fieldtype} to add in output datasource
+
+        Returns
+        -------
+        datasource.GetLayer() object of final shapefile, dictionary of field schema {fieldName: fieldType}
+    """
+
+    out_ds = ogr.GetDriverByName('ESRI Shapefile').CreateDataSource(output_shp)
+    dst_layer = out_ds.CreateLayer(os.path.basename(output_shp), osr.SpatialReference(str(layer.GetSpatialRef())),
+                                   ogr.wkbMultiLineString, options=["ENCODING=CP1251"])
+    dst_layer.CreateFields(layer.schema)
+    layer_definition_in = layer.GetLayerDefn()
+    layer_definition_out = dst_layer.GetLayerDefn()
+    if input_fields is None:
+        in_fields = []
+    for i in range(layer_definition_in.GetFieldCount()):
+        field_name = layer_definition_in.GetFieldDefn(i).GetName()
+        if input_fields is None:
+            in_fields.append(field_name)
+        elif field_name in input_fields:
+            in_fields.append(field_name)
+        else:
+            delete_fields.append(field_name)
+    for field_name in in_fields:
+        if field_name in delete_fields:
+            dst_layer.DeleteField(layer_definition_out.GetFieldIndex(field_name))
+            in_fields.remove(field_name)
+    if add_field is not None:
+        for field in add_field:
+            dst_layer.CreateField(ogr.FieldDefn(field, add_field[field]))
+    return in_fields
 
 
 def centrality_normalization(shp, node_number, generation_count):
     """Normalization of centrality values by the number of possible links between substations and generation;
-    distributon of normalized values equally between parallel edges of the same voltage class
+    distribution of normalized values equally between parallel edges of the same voltage class
 
         Parameters
         ----------
@@ -236,7 +267,7 @@ def centrality_normalization(shp, node_number, generation_count):
     out_ds = ogr.GetDriverByName('ESRI Shapefile').Open(shp, 1)
     layer = out_ds.GetLayer()
     for feature in layer:
-        count_field = feature.GetField('COUNT')
+        count_field = feature.GetField('COUNTFID')
         count_circuit = feature.GetField('Circ_Count')
         el_cen = float(count_field) / ((node_number * (node_number - 1)) - generation_count * (generation_count - 1))
         el_centrality_distributed = el_cen/count_circuit
@@ -259,9 +290,7 @@ if __name__ == "__main__":
     data_source = ogr.GetDriverByName('ESRI Shapefile').Open(edges, 1)
     layer = data_source.GetLayer()
     geometry_extraction(layer)
-    dst_layer, in_fields = import_field_schema(layer, output_shp, ['ident', 'Geometry'], {'COUNT': ogr.OFTInteger,
-                                                                              'El_Cen': ogr.OFTReal,
-                                                                              'El_C_Distr': ogr.OFTReal})
-    dissolved_lines = dissolve_layer(layer, in_fields, {'COUNT': 'FID'})
-    feature_creation(output_shp, dissolved_lines)
+    dissolve_layer(layer, output_shp, delete_fields=['ident', 'Geometry'], add_fields={'El_Cen': ogr.OFTReal,
+                                                                                'El_C_Distr': ogr.OFTReal},
+                                                                                stats_dict={'COUNT': 'FID'})
     centrality_normalization(output_shp, node_count, generation_count)
