@@ -73,7 +73,7 @@ def trace_lines(G_network, voltage):
 
             Returns
             -------
-            networkx graph and tracing dictionary as {node: (start, end)}"""
+            networkx graph and tracing dictionary kind of {node: (start, end)}"""
     trace_dict = {}
     line_dict = {}
     for line in G_network.edges(data=True):
@@ -291,6 +291,5 @@ if __name__ == "__main__":
     layer = data_source.GetLayer()
     geometry_extraction(layer)
     dissolve_layer(layer, output_shp, delete_fields=['ident', 'Geometry'], add_fields={'El_Cen': ogr.OFTReal,
-                                                                                'El_C_Distr': ogr.OFTReal},
-                                                                                stats_dict={'COUNT': 'FID'})
+                                                                'El_C_Distr': ogr.OFTReal}, stats_dict={'COUNT': 'FID'})
     centrality_normalization(output_shp, node_count, generation_count)
