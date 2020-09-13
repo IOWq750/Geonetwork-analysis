@@ -14,7 +14,6 @@ See https://en.wikipedia.org/wiki/Shapefile for additional information.
 """
 import networkx as nx
 import os
-from osgeo import osr
 
 
 __all__ = ['read_shp', 'write_shp']
@@ -90,11 +89,11 @@ def read_shp(path, unique_attribute, simplify=True, geom_attrs=True, strict=True
     if not isinstance(path, str):
         return
 
-    net = nx.MultiDiGraph()
+    net = nx.MultiGraph()
     shp = ogr.Open(path)
     layer = shp.GetLayer()
-    spatialRef = str(layer.GetSpatialRef())
-    net.graph['crs'] = spatialRef
+    spatial_ref = str(layer.GetSpatialRef())
+    net.graph['crs'] = spatial_ref
     if shp is None:
         raise RuntimeError("Unable to open {}".format(path))
     for field_name in shp:
@@ -219,14 +218,15 @@ def write_shp(G, unique_attribute, outdir):
     ----------
     .. [1] https://en.wikipedia.org/wiki/Shapefile
     """
-    os.environ['SHAPE_ENCODING'] = "cp1251"
-    srs = osr.SpatialReference(G.graph['crs'])
     try:
-        from osgeo import ogr
+        from osgeo import ogr, osr
     except ImportError:
         raise ImportError("write_shp requires OGR: http://www.gdal.org/")
     # easier to debug in python if ogr throws exceptions
     ogr.UseExceptions()
+
+    os.environ['SHAPE_ENCODING'] = "cp1251"
+    srs = osr.SpatialReference(G.graph['crs'])
 
     def netgeometry(key, data):
         if 'Wkb' in data:

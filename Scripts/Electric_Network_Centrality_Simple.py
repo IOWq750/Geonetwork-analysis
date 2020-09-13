@@ -277,9 +277,9 @@ def centrality_normalization(shp, node_number, generation_count):
 
 
 if __name__ == "__main__":
-    os.chdir(r'F:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia')
-    power_lines = 'Lines_p.shp'
-    power_points = 'Points_p.shp'
+    os.chdir(r'F:\YandexDisk\FSK\BAM')
+    power_lines = 'Lines_P.shp'
+    power_points = 'Points_P.shp'
     path_output = 'Output'
 
     output_shp = os.path.join(path_output, 'el_centrality.shp')
