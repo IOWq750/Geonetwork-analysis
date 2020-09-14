@@ -10,17 +10,18 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
 
         Parameters
         ----------
-        input_shp: shapefile path
+        input_shp: str
+            shapefile path
 
-        directed: 'true' or 'false'
+        directed: bool
             If value is true – directed graph will be created.
             If value is false - undirected graph will be created
 
-        multigraph: 'true' or 'false'
+        multigraph: bool
             If value is true – multigraph will be created
             If value is false – simple graph will be created
 
-        parallel_edges_attribute: string
+        parallel_edges_attribute: str
             Field of the shapefile which allows to distinguish parallel edges.
             Note that it could be a field of different types, but all values of this attribute should be filled
         Returns
