@@ -18,4 +18,4 @@ if __name__ == '__main__':
     G = aux_ie.convert_shp_to_graph(in_graph, digraph, multigraph, multi_attr)
     nodes = nx.closeness_centrality(G, distance=weight)
     nx.set_node_attributes(G, nodes, 'CC')
-    aux_ie.export_path_to_shp(G, multigraph, multi_attr, output)
+    aux_ie.export_path_to_shp(G, multigraph, output, multi_attr)

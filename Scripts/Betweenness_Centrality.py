@@ -57,5 +57,5 @@ if __name__ == "__main__":
         betweenness_multiedge_distribution(G, ebc, distributed)
     else:
         nx.set_edge_attributes(G, ebc, 'BC')
-    aux_ie.export_graph_to_shp(G, multigraph, multi_attr, output)
+    aux_ie.export_graph_to_shp(G, multigraph, output, multi_attr)
 

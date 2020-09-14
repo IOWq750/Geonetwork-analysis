@@ -8,7 +8,6 @@ sys.path.insert(1, curdir)
 import import_export_shp as aux_ie
 
 
-
 def degree_centrality(in_graph, multigraph, multi_attr, output, digraph):
     G = aux_ie.convert_shp_to_graph(in_graph, digraph, multigraph, multi_attr)
     if digraph == 'true':

@@ -39,9 +39,27 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
     return graph
 
 
-def export_graph_to_shp(G, multy, multy_attribute, output_workspace):
-    """Export graph to shapefile
+def export_graph_to_shp(G, multy, output_workspace, multy_attribute=None):
+    """Export networkx graph object to shapefile
 
+        Parameters
+        ----------
+        G: networkx graph object
+
+        multy: bool
+            If value is true – multigraph will be created
+            If value is false – simple graph will be created
+
+        output_workspace: str
+            path to the folder with output shapefile
+
+        multy_attribute: str
+            Field of the shapefile which allows to distinguish parallel edges.
+            Note that it could be a field of different types, but all values of this attribute should be filled
+
+        Returns
+        -------
+        None
 
     """
     for item in ['edges.shp', 'nodes,shp']:
@@ -57,8 +75,23 @@ def export_graph_to_shp(G, multy, multy_attribute, output_workspace):
 def export_path_to_shp(G, multy, output_workspace, path_dict_list):
     """Export of path (list of nodes) through graph to shapefile
 
+        Parameters
+        ----------
+        G: networkx graph object
 
+        multy: bool
+            If value is true – multigraph will be created
+            If value is false – simple graph will be created
 
+        output_workspace: str
+            path to the folder with output shapefile
+
+        path_dict_list: list
+            list of dicts kind of {start: [node1, node2, node3]}
+
+        Returns
+        -------
+        None
     """
     new_graph = nx.MultiGraph(crs=G.graph['crs'])
     e = 0
