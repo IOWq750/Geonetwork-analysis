@@ -40,7 +40,10 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
 
 
 def export_graph_to_shp(G, multy, multy_attribute, output_workspace):
-    """Export graph to shapefile"""
+    """Export graph to shapefile
+
+
+    """
     for item in ['edges.shp', 'nodes,shp']:
         filename = os.path.join(output_workspace, item)
         if os.path.exists(filename):
@@ -51,29 +54,36 @@ def export_graph_to_shp(G, multy, multy_attribute, output_workspace):
         nx.write_shp(G, output_workspace)
 
 
-def export_path_to_shp(G, multy, output_workspace, path_dict):
-    """Export of path (list of nodes) through graph to shapefile"""
+def export_path_to_shp(G, multy, output_workspace, path_dict_list):
+    """Export of path (list of nodes) through graph to shapefile
+
+
+
+    """
     new_graph = nx.MultiGraph(crs=G.graph['crs'])
-    a = 0
-    for node in path_dict:
-        path_list = path_dict[node]
-        path_list.insert(0, node)
-        b = 0
-        for edge in G.edges(keys=True, data=True):
-            attribute_data = new_graph.get_edge_data(*edge)
-            new_attribute_data = {}
-            Wkt = attribute_data['Wkt']
-            c = 0
-            for i in range(len(path_list) - 1):
-                identifier = str(a) + '_' + str(b) + '_' + str(c)
-                if tuple([tuple(path_list[i]), tuple(path_list[i + 1])]) == tuple(edge[:2])\
-                        or tuple([tuple(path_list[i + 1]), tuple(path_list[i])]) == tuple(edge[:2]):
-                    new_graph.add_edge(edge[0], edge[1], identifier, Name=edge[2], ident=identifier, Wkt=Wkt)
-                    new_attribute_data[edge[0], edge[1], identifier] = attribute_data
-                    nx.set_edge_attributes(new_graph, new_attribute_data)
-                c += 1
-            b += 1
-        a += 1
+    e = 0
+    for path_dict in path_dict_list:
+        a = 0
+        for node in path_dict:
+            path_list = path_dict[node]
+            path_list.insert(0, node)
+            b = 0
+            for edge in G.edges(keys=True, data=True):
+                attribute_data = new_graph.get_edge_data(*edge)
+                new_attribute_data = {}
+                Wkt = attribute_data['Wkt']
+                c = 0
+                for i in range(len(path_list) - 1):
+                    identifier = str(e) + str(a) + str(b) + str(c)
+                    if tuple([tuple(path_list[i]), tuple(path_list[i + 1])]) == tuple(edge[:2])\
+                            or tuple([tuple(path_list[i + 1]), tuple(path_list[i])]) == tuple(edge[:2]):
+                        new_graph.add_edge(edge[0], edge[1], identifier, Name=edge[2], ident=identifier, Wkt=Wkt)
+                        new_attribute_data[edge[0], edge[1], identifier] = attribute_data
+                        nx.set_edge_attributes(new_graph, new_attribute_data)
+                    c += 1
+                b += 1
+            a += 1
+        e += 1
     if multy == 'true':
         nx_multi_shp.write_shp(new_graph, 'ident', output_workspace)
     else:

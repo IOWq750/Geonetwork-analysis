@@ -53,9 +53,9 @@ def el_centrality(power_lines, power_points, name, weight, voltage, output_works
                 generation.add(node)
     generation_count = len(generation)
     substation_count = number_nodes - generation_count
-    G_network, trace_dict = trace_lines(G_network, voltage)  # Conversion of trace_dict is not implemented
+    G_network, trace_dict = trace_lines(G_network, voltage)
     shortest_path = nx.multi_source_dijkstra_path(G_network, generation, weight=weight)
-    aux_ie.export_path_to_shp(G_network, "true", output_workspace, shortest_path)
+    aux_ie.export_path_to_shp(G_network, "true", output_workspace, trace_dict + [shortest_path])
     return number_nodes, generation_count, substation_count
 
 
@@ -73,18 +73,27 @@ def trace_lines(G_network, voltage):
 
             Returns
             -------
-            networkx graph and tracing dictionary kind of {node: (start, end)}"""
-    trace_dict = {}
+            networkx graph and list of tracing dictionaries kind of {start: (start, end)}"""
     line_dict = {}
+    trace_dict_list = [{}]
     for line in G_network.edges(data=True):
+        checked_lines = []
         start_end = line[:2]
         item = (start_end, line[2][voltage])
         item_inverted = (start_end[1], start_end[0], line[2][voltage])
         if item not in line_dict and item_inverted not in line_dict:
             line_dict[item] = 1
-            trace_dict[start_end[0]] = [start_end[0], start_end[1]]
         else:
             line_dict[item] += 1
+        for i in range(len(trace_dict_list)):
+            if line not in checked_lines:
+                if start_end[0] not in trace_dict_list[i]:
+                    trace_dict_list[i][start_end[0]] = [start_end[0], start_end[1]]
+                    checked_lines.append(line)
+                elif i + 1 == len(trace_dict_list):
+                    trace_dict_list.append({})
+                    trace_dict_list[i + 1][start_end[0]] = [start_end[0], start_end[1]]
+                    checked_lines.append(line)
     circuit_dict = {}
     for line in G_network.edges(keys=True, data=True):
         try:
@@ -92,7 +101,7 @@ def trace_lines(G_network, voltage):
         except:
             circuit_dict[line[:3]] = line_dict[line[1], line[0], line[3][voltage]]
     nx.set_edge_attributes(G_network, circuit_dict, 'Circ_Count')
-    return G_network, trace_dict
+    return G_network, trace_dict_list
 
 
 def create_cpg(shapefile):
@@ -267,7 +276,7 @@ def centrality_normalization(shp, node_number, generation_count):
     out_ds = ogr.GetDriverByName('ESRI Shapefile').Open(shp, 1)
     layer = out_ds.GetLayer()
     for feature in layer:
-        count_field = feature.GetField('COUNTFID')
+        count_field = feature.GetField('COUNTFID') - 1
         count_circuit = feature.GetField('Circ_Count')
         el_cen = float(count_field) / ((node_number * (node_number - 1)) - generation_count * (generation_count - 1))
         el_centrality_distributed = el_cen/count_circuit
@@ -277,7 +286,7 @@ def centrality_normalization(shp, node_number, generation_count):
 
 
 if __name__ == "__main__":
-    os.chdir(r'F:\YandexDisk\FSK\BAM')
+    os.chdir(r'f:\YandexDisk\Projects\RFFI_Transport\Ural_Siberia')
     power_lines = 'Lines_P.shp'
     power_points = 'Points_P.shp'
     path_output = 'Output'
