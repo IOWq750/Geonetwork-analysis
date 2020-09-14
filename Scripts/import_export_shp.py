@@ -13,11 +13,11 @@ def convert_shp_to_graph(input_shp, directed, multigraph, parallel_edges_attribu
         input_shp: str
             shapefile path
 
-        directed: bool
+        directed: str
             If value is true – directed graph will be created.
             If value is false - undirected graph will be created
 
-        multigraph: bool
+        multigraph: str
             If value is true – multigraph will be created
             If value is false – simple graph will be created
 
@@ -47,7 +47,7 @@ def export_graph_to_shp(G, multy, output_workspace, multy_attribute=None):
         ----------
         G: networkx graph object
 
-        multy: bool
+        multy: str
             If value is true – multigraph will be created
             If value is false – simple graph will be created
 
@@ -80,7 +80,7 @@ def export_path_to_shp(G, multy, output_workspace, path_dict_list):
         ----------
         G: networkx graph object
 
-        multy: bool
+        multy: str
             If value is true – multigraph will be created
             If value is false – simple graph will be created
 
