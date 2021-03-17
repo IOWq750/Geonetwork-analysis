@@ -53,7 +53,7 @@ def topological_distance(power_lines, power_points, name, weight, voltage, outpu
                 generation.add(node)
     generation_count = len(generation)
     substation_count = number_nodes - generation_count
-    G_network, trace_dict = trace_lines(G_network, voltage)
+    # G_network, trace_dict = trace_lines(G_network, voltage)
     shortest_path = nx.multi_source_dijkstra_path(G_network, generation, weight=weight)
     aux_ie.export_path_to_shp(G_network, "true", output_workspace, trace_dict + [shortest_path])
     return number_nodes, generation_count, substation_count
